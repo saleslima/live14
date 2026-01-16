@@ -245,13 +245,19 @@ peer.on('connection', conn => {
 });
 
 /* Gerar link */
-btnLink.onclick = () => {
-    generatedLink = `${location.origin}${location.pathname}?r=${peerId}`;
-    linkDiv.innerText = generatedLink;
-    statusEl.innerText = "Link gerado. Aguardando acesso...";
-    btnCopy.disabled = false;
-    btnSendWhatsApp.disabled = false;
-    btnSendSMS.disabled = false;
+btnLink.onclick = async () => {
+    try {
+        await startCamera();
+        generatedLink = `${location.origin}${location.pathname}?r=${peerId}`;
+        linkDiv.innerText = generatedLink;
+        statusEl.innerText = "Link gerado. Aguardando acesso...";
+        btnCopy.disabled = false;
+        btnSendWhatsApp.disabled = false;
+        btnSendSMS.disabled = false;
+    } catch (error) {
+        statusEl.innerText = "Erro ao iniciar câmera";
+        statusEl.style.color = "#ef4444";
+    }
 };
 
 /* Copiar link */
