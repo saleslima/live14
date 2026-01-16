@@ -94,7 +94,6 @@ video {
     <div id="link"></div>
     
     <div style="margin-top: 15px;">
-        <input type="tel" id="senderPhone" placeholder="Seu telefone (com DDD)">
         <input type="tel" id="recipientPhone" placeholder="Telefone destinatário">
         <button id="btnSendWhatsApp" disabled>📱 WhatsApp</button>
         <button id="btnSendSMS" disabled>💬 SMS</button>
@@ -118,12 +117,12 @@ const btnSendWhatsApp = document.getElementById("btnSendWhatsApp");
 const btnSendSMS = document.getElementById("btnSendSMS");
 const statusEl = document.getElementById("status");
 const locationInfo = document.getElementById("locationInfo");
-const senderPhone = document.getElementById("senderPhone");
 const recipientPhone = document.getElementById("recipientPhone");
 
 let peerId;
 let localStream;
 let generatedLink = "";
+let localVideoAdded = false;
 
 const peer = new Peer();
 
@@ -135,7 +134,10 @@ async function startCamera() {
             video: true,
             audio: true
         });
-        addVideo(localStream, true);
+        if (!localVideoAdded) {
+            addVideo(localStream, true);
+            localVideoAdded = true;
+        }
         return localStream;
     } catch (error) {
         statusEl.innerText = "⚠️ Erro ao acessar câmera: " + error.message;
