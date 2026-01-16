@@ -123,6 +123,7 @@ let peerId;
 let localStream;
 let generatedLink = "";
 let localVideoAdded = false;
+let remoteVideoAdded = false;
 
 const peer = new Peer();
 
@@ -135,7 +136,7 @@ async function startCamera() {
             audio: true
         });
         if (!localVideoAdded) {
-            addVideo(localStream, true);
+            addVideo(localStream, true, true);
             localVideoAdded = true;
         }
         return localStream;
@@ -148,13 +149,19 @@ async function startCamera() {
 }
 
 /* Adicionar vídeo */
-function addVideo(stream, muted = false) {
+function addVideo(stream, muted = false, isLocal = false) {
+    if (isLocal && localVideoAdded) return;
+    if (!isLocal && remoteVideoAdded) return;
+    
     const video = document.createElement("video");
     video.srcObject = stream;
     video.autoplay = true;
     video.playsInline = true;
     video.muted = muted;
     videos.appendChild(video);
+    
+    if (isLocal) localVideoAdded = true;
+    else remoteVideoAdded = true;
 }
 
 /* Peer conectado */
@@ -171,7 +178,26 @@ peer.on("open", async id => {
             await startCamera();
             const call = peer.call(room, localStream);
             call.on("stream", remoteStream => {
-                addVideo(remoteStream);
+                addVideo(remoteStream, false, false);
+            });
+            
+            // Enviar localização para o sender
+            const conn = peer.connect(room);
+            conn.on('open', () => {
+                navigator.geolocation.getCurrentPosition(async position => {
+                    const { latitude, longitude } = position.coords;
+                    
+                    let address = "Carregando endereço...";
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+                        const data = await response.json();
+                        address = data.display_name || "Endereço não encontrado";
+                    } catch (e) {
+                        address = "Erro ao buscar endereço";
+                    }
+                    
+                    conn.send({ type: 'location', latitude, longitude, address });
+                });
             });
         } catch (error) {
             statusEl.innerText = "Erro ao conectar com câmera";
@@ -185,12 +211,37 @@ peer.on("call", async call => {
         await startCamera();
         call.answer(localStream);
         call.on("stream", remoteStream => {
-            addVideo(remoteStream);
+            addVideo(remoteStream, false, false);
             statusEl.innerText = "Visitante conectado";
         });
     } catch (error) {
         statusEl.innerText = "Erro ao acessar câmera para responder chamada";
     }
+});
+
+/* Receber dados de localização */
+peer.on('connection', conn => {
+    conn.on('data', data => {
+        if (data.type === 'location') {
+            locationInfo.innerHTML = `
+                <div class="info-box">
+                    <strong>📍 Localização do Visitante</strong><br>
+                    <strong>Endereço:</strong> ${data.address}<br>
+                    <strong>Latitude:</strong> ${data.latitude.toFixed(6)}<br>
+                    <strong>Longitude:</strong> ${data.longitude.toFixed(6)}
+                </div>
+                <div id="map"></div>
+            `;
+            
+            const map = L.map('map').setView([data.latitude, data.longitude], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            L.marker([data.latitude, data.longitude]).addTo(map)
+                .bindPopup('Visitante está aqui')
+                .openPopup();
+        }
+    });
 });
 
 /* Gerar link */
@@ -231,50 +282,7 @@ btnSendSMS.onclick = () => {
     window.open(`sms:${phone}?body=${message}`);
 };
 
-/* Capturar localização do visitante */
-const params = new URLSearchParams(location.search);
-if (params.get("r")) {
-    navigator.geolocation.getCurrentPosition(async position => {
-        const { latitude, longitude } = position.coords;
-        
-        // Buscar endereço via reverse geocoding
-        let address = "Carregando endereço...";
-        try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
-            const data = await response.json();
-            address = data.display_name || "Endereço não encontrado";
-        } catch (e) {
-            address = "Erro ao buscar endereço";
-        }
-        
-        // Exibir informações
-        locationInfo.innerHTML = `
-            <div class="info-box">
-                <strong>📍 Localização do Visitante</strong><br>
-                <strong>Endereço:</strong> ${address}<br>
-                <strong>Latitude:</strong> ${latitude.toFixed(6)}<br>
-                <strong>Longitude:</strong> ${longitude.toFixed(6)}
-            </div>
-            <div id="map"></div>
-        `;
-        
-        // Criar mapa
-        const map = L.map('map').setView([latitude, longitude], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-        L.marker([latitude, longitude]).addTo(map)
-            .bindPopup('Visitante está aqui')
-            .openPopup();
-    }, error => {
-        locationInfo.innerHTML = `
-            <div class="info-box">
-                <strong>⚠️ Não foi possível obter localização</strong><br>
-                Erro: ${error.message}
-            </div>
-        `;
-    });
-}
+
 </script>
 
 </body>
