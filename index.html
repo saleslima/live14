@@ -73,6 +73,7 @@ input {
 }
 video {
     width: 200px;
+    max-width: 100%;
     background: black;
     border-radius: 8px;
 }
@@ -80,6 +81,139 @@ video {
     font-size: 13px;
     color: #94a3b8;
     margin-top: 5px;
+}
+#chat {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 300px;
+    max-width: 100%;
+    height: 400px;
+    background: #1e293b;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #334155;
+    z-index: 1000;
+}
+#chatHeader {
+    background: #0b5cff;
+    padding: 10px;
+    font-weight: bold;
+    border-radius: 8px 8px 0 0;
+}
+#chatMessages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+.message {
+    margin-bottom: 10px;
+    padding: 8px;
+    background: #334155;
+    border-radius: 6px;
+    word-wrap: break-word;
+}
+.message.sent {
+    background: #0b5cff;
+    margin-left: 20px;
+}
+.message.received {
+    background: #475569;
+    margin-right: 20px;
+}
+#chatInput {
+    display: flex;
+    padding: 10px;
+    gap: 5px;
+}
+#chatInput input {
+    flex: 1;
+    margin: 0;
+}
+#chatInput button {
+    margin: 0;
+    padding: 10px;
+}
+
+@media (max-width: 768px) {
+    #controls {
+        padding: 10px 5px;
+    }
+    
+    button {
+        padding: 12px 14px;
+        font-size: 14px;
+        margin: 3px;
+        width: auto;
+    }
+    
+    input {
+        width: calc(100% - 20px);
+        max-width: 300px;
+        margin: 5px auto;
+        display: block;
+    }
+    
+    #controls > div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    video {
+        width: calc(50% - 10px);
+        min-width: 150px;
+    }
+    
+    #chat {
+        width: 100%;
+        height: 50vh;
+        right: 0;
+        left: 0;
+        border-radius: 0;
+    }
+    
+    #chatHeader {
+        border-radius: 0;
+    }
+    
+    #map {
+        height: 200px;
+    }
+    
+    .info-box {
+        font-size: 13px;
+        margin: 5px;
+        padding: 8px;
+    }
+    
+    #videos {
+        padding: 5px;
+        padding-bottom: calc(50vh + 10px);
+    }
+}
+
+@media (max-width: 480px) {
+    header {
+        font-size: 14px;
+        padding: 10px;
+    }
+    
+    video {
+        width: 100%;
+    }
+    
+    button {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+    
+    #link {
+        font-size: 12px;
+        padding: 0 10px;
+    }
 }
 </style>
 </head>
@@ -90,6 +224,8 @@ video {
 <div id="controls">
     <button id="btnLink" disabled>🔗 Gerar Link</button>
     <button id="btnCopy" disabled>📋 Copiar Link</button>
+    <button id="btnToggleVideo" disabled>👁️ Ocultar Meu Vídeo</button>
+    <button id="btnRecord" disabled>⏺️ Gravar Vídeo</button>
     <div class="status" id="status">Inicializando conexão...</div>
     <div id="link"></div>
     
@@ -103,6 +239,15 @@ video {
 <div id="locationInfo"></div>
 
 <div id="videos"></div>
+
+<div id="chat">
+    <div id="chatHeader">💬 Chat</div>
+    <div id="chatMessages"></div>
+    <div id="chatInput">
+        <input type="text" id="messageInput" placeholder="Digite uma mensagem...">
+        <button id="btnSend">Enviar</button>
+    </div>
+</div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -118,12 +263,24 @@ const btnSendSMS = document.getElementById("btnSendSMS");
 const statusEl = document.getElementById("status");
 const locationInfo = document.getElementById("locationInfo");
 const recipientPhone = document.getElementById("recipientPhone");
+const btnToggleVideo = document.getElementById("btnToggleVideo");
+const btnRecord = document.getElementById("btnRecord");
+const chatMessages = document.getElementById("chatMessages");
+const messageInput = document.getElementById("messageInput");
+const btnSend = document.getElementById("btnSend");
 
 let peerId;
 let localStream;
 let generatedLink = "";
 let localVideoAdded = false;
 let remoteVideoAdded = false;
+let localVideoElement = null;
+let remoteVideoElement = null;
+let videoVisible = true;
+let isRecording = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+let dataConnection = null;
 
 const peer = new Peer();
 
@@ -160,8 +317,36 @@ function addVideo(stream, muted = false, isLocal = false) {
     video.muted = muted;
     videos.appendChild(video);
     
-    if (isLocal) localVideoAdded = true;
-    else remoteVideoAdded = true;
+    if (isLocal) {
+        localVideoAdded = true;
+        localVideoElement = video;
+    } else {
+        remoteVideoAdded = true;
+        remoteVideoElement = video;
+    }
+}
+
+/* Enviar mensagem no chat */
+function sendMessage(text) {
+    if (!text.trim() || !dataConnection) return;
+    
+    dataConnection.send({ type: 'chat', message: text });
+    
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message sent';
+    msgDiv.textContent = text;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    messageInput.value = '';
+}
+
+/* Receber mensagem no chat */
+function receiveMessage(text) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message received';
+    msgDiv.textContent = text;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 /* Peer conectado */
@@ -182,8 +367,8 @@ peer.on("open", async id => {
             });
             
             // Enviar localização para o sender
-            const conn = peer.connect(room);
-            conn.on('open', () => {
+            dataConnection = peer.connect(room);
+            dataConnection.on('open', () => {
                 navigator.geolocation.getCurrentPosition(async position => {
                     const { latitude, longitude } = position.coords;
                     
@@ -196,8 +381,14 @@ peer.on("open", async id => {
                         address = "Erro ao buscar endereço";
                     }
                     
-                    conn.send({ type: 'location', latitude, longitude, address });
+                    dataConnection.send({ type: 'location', latitude, longitude, address });
                 });
+            });
+            
+            dataConnection.on('data', data => {
+                if (data.type === 'chat') {
+                    receiveMessage(data.message);
+                }
             });
         } catch (error) {
             statusEl.innerText = "Erro ao conectar com câmera";
@@ -221,6 +412,7 @@ peer.on("call", async call => {
 
 /* Receber dados de localização */
 peer.on('connection', conn => {
+    dataConnection = conn;
     conn.on('data', data => {
         if (data.type === 'location') {
             locationInfo.innerHTML = `
@@ -240,6 +432,11 @@ peer.on('connection', conn => {
             L.marker([data.latitude, data.longitude]).addTo(map)
                 .bindPopup('Visitante está aqui')
                 .openPopup();
+            
+            btnToggleVideo.disabled = false;
+            btnRecord.disabled = false;
+        } else if (data.type === 'chat') {
+            receiveMessage(data.message);
         }
     });
 });
@@ -288,6 +485,60 @@ btnSendSMS.onclick = () => {
     window.open(`sms:${phone}?body=${message}`);
 };
 
+/* Toggle vídeo */
+btnToggleVideo.onclick = () => {
+    if (localVideoElement) {
+        videoVisible = !videoVisible;
+        localVideoElement.style.display = videoVisible ? 'block' : 'none';
+        btnToggleVideo.textContent = videoVisible ? '👁️ Ocultar Meu Vídeo' : '👁️ Mostrar Meu Vídeo';
+    }
+};
+
+/* Gravar vídeo */
+btnRecord.onclick = () => {
+    if (!isRecording && remoteVideoElement && remoteVideoElement.srcObject) {
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(remoteVideoElement.srcObject);
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        };
+        
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gravacao_${Date.now()}.webm`;
+            a.click();
+            statusEl.innerText = 'Gravação salva!';
+        };
+        
+        mediaRecorder.start();
+        isRecording = true;
+        btnRecord.textContent = '⏹️ Parar Gravação';
+        btnRecord.style.background = '#ef4444';
+        statusEl.innerText = 'Gravando...';
+    } else if (isRecording && mediaRecorder) {
+        mediaRecorder.stop();
+        isRecording = false;
+        btnRecord.textContent = '⏺️ Gravar Vídeo';
+        btnRecord.style.background = '#0b5cff';
+    }
+};
+
+/* Chat */
+btnSend.onclick = () => {
+    sendMessage(messageInput.value);
+};
+
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        sendMessage(messageInput.value);
+    }
+});
 
 </script>
 
