@@ -167,8 +167,10 @@ export class EventHandlers {
 
     async enableSenderVideo() {
         try {
+            this.ui.setStatus("Ativando câmera...");
             const result = await this.camera.toggleSenderVideo(this.peerConnection.currentCall);
             this.ui.updateMyVideoButton(result.enabled);
+            this.ui.setStatus("Câmera ativada - Compartilhando vídeo");
         } catch (err) {
             console.error("Erro ao ativar vídeo:", err);
             this.ui.setStatus("Erro ao ativar vídeo", "#ef4444");

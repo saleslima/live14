@@ -9,7 +9,19 @@ export class ConnectionSetup {
         this.ui = ui;
     }
 
-    setupSenderMode() {
+    async setupSenderMode() {
+        // Restore sender video state from localStorage
+        const senderVideoEnabled = localStorage.getItem("livecam_senderVideo") === "true";
+        if (senderVideoEnabled) {
+            try {
+                await this.camera.restoreSenderVideo();
+                this.ui.updateMyVideoButton(true);
+            } catch (e) {
+                console.error("Failed to restore sender video:", e);
+                localStorage.removeItem("livecam_senderVideo");
+            }
+        }
+        
         // Handle incoming calls
         this.peerConnection.onStream(async (call) => {
             const mediaStream = this.camera.senderStream || await this.camera.startSenderMedia();
@@ -53,7 +65,14 @@ export class ConnectionSetup {
 
     async setupRecipientMode() {
         try {
-            await this.camera.startCamera();
+            // Check if recipient had video enabled
+            const recipientVideoEnabled = localStorage.getItem("livecam_recipientVideo") !== "false";
+            
+            if (recipientVideoEnabled) {
+                await this.camera.startCamera();
+            } else {
+                await this.camera.startAudioOnly();
+            }
             this.ui.setStatus("Conectando...");
             
             const params = new URLSearchParams(window.location.search);

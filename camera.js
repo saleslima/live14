@@ -50,6 +50,37 @@ export class CameraManager {
         }
     }
 
+    async startAudioOnly() {
+        if (this.localStream) return this.localStream;
+        
+        try {
+            this.localStream = await navigator.mediaDevices.getUserMedia({
+                video: false,
+                audio: true
+            });
+            return this.localStream;
+        } catch (error) {
+            console.error("Audio error:", error);
+            throw error;
+        }
+    }
+
+    async restoreSenderVideo() {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
+            audio: true
+        });
+        
+        if (this.senderStream) {
+            this.senderStream.getTracks().forEach(t => t.stop());
+        }
+        
+        this.senderStream = newStream;
+        this.addVideo(this.senderStream, true, false, true);
+        
+        return this.senderStream;
+    }
+
     stopLocalCamera() {
         try {
             if (this.localStream) {
@@ -78,6 +109,7 @@ export class CameraManager {
         video.autoplay = true;
         video.playsInline = true;
         video.muted = muted;
+        video.style.display = 'block';
 
         wrapper.appendChild(video);
         
@@ -135,10 +167,24 @@ export class CameraManager {
         try {
             this.usingFrontCamera = !this.usingFrontCamera;
             
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
+            const constraints = {
+                video: {
+                    facingMode: { exact: this.usingFrontCamera ? "user" : "environment" }
+                },
                 audio: true,
-            });
+            };
+            
+            let newStream;
+            try {
+                newStream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (e) {
+                // Fallback if exact constraint fails
+                console.log("Exact facingMode failed, trying ideal:", e);
+                constraints.video = {
+                    facingMode: { ideal: this.usingFrontCamera ? "user" : "environment" }
+                };
+                newStream = await navigator.mediaDevices.getUserMedia(constraints);
+            }
 
             if (this.localStream) {
                 this.localStream.getTracks().forEach(t => t.stop());
@@ -163,8 +209,9 @@ export class CameraManager {
         const hasVideo = this.senderStream && this.senderStream.getVideoTracks().length > 0;
         
         if (!hasVideo) {
+            // Request camera access (this gives permission for all cameras on the device)
             const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "user" },
+                video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
                 audio: true
             });
             
@@ -174,10 +221,12 @@ export class CameraManager {
             
             this.senderStream = newStream;
             
+            // Always add video to ensure it's displayed on sender's screen
             if (!this.senderVideoActive) {
                 this.addVideo(this.senderStream, true, false, true);
             } else if (this.senderVideoElement) {
                 this.senderVideoElement.srcObject = this.senderStream;
+                this.senderVideoElement.style.display = 'block';
             }
             
             if (currentCall && currentCall.peerConnection) {
@@ -196,6 +245,7 @@ export class CameraManager {
                 });
             }
             
+            localStorage.setItem("livecam_senderVideo", "true");
             return { enabled: true };
         } else {
             const audioOnlyStream = await navigator.mediaDevices.getUserMedia({
@@ -226,6 +276,7 @@ export class CameraManager {
             
             this.removeSenderVideo();
             
+            localStorage.setItem("livecam_senderVideo", "false");
             return { enabled: false };
         }
     }
@@ -237,10 +288,25 @@ export class CameraManager {
 
         try {
             this.usingFrontCamera = !this.usingFrontCamera;
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
+            
+            const constraints = {
+                video: {
+                    facingMode: { exact: this.usingFrontCamera ? "user" : "environment" }
+                },
                 audio: true,
-            });
+            };
+            
+            let newStream;
+            try {
+                newStream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (e) {
+                // Fallback if exact constraint fails
+                console.log("Exact facingMode failed, trying ideal:", e);
+                constraints.video = {
+                    facingMode: { ideal: this.usingFrontCamera ? "user" : "environment" }
+                };
+                newStream = await navigator.mediaDevices.getUserMedia(constraints);
+            }
 
             if (this.senderStream) {
                 this.senderStream.getTracks().forEach(t => t.stop());
@@ -271,6 +337,7 @@ export class CameraManager {
             return newStream;
         } catch (err) {
             console.error("Erro ao trocar câmera do remetente:", err);
+            this.usingFrontCamera = !this.usingFrontCamera;
             throw err;
         }
     }
@@ -294,6 +361,9 @@ export class CameraManager {
             if (this.localVideoElement) {
                 this.localVideoElement.srcObject = this.localStream;
                 this.localVideoElement.style.display = 'block';
+            } else {
+                this.addVideo(this.localStream, true, true);
+                this.localVideoAdded = true;
             }
             
             if (currentCall && currentCall.peerConnection) {
@@ -312,6 +382,7 @@ export class CameraManager {
                 });
             }
             
+            localStorage.setItem("livecam_recipientVideo", "true");
             return { enabled: true };
         } else {
             // Disable video

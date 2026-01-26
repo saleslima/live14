@@ -1,0 +1,19 @@
+if (currentCall && currentCall.peerConnection) {
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            
+            const senders = currentCall.peerConnection.getSenders();
+            senders.forEach(sender => {
+                if (sender.track) {
+                    if (sender.track.kind === "video") {
+                        sender.replaceTrack(null);
+                    } else if (sender.track.kind === "audio") {
+                        sender.replaceTrack(audioTrack);
+                    }
+                }
+            });
+        }
+        
+        localStorage.setItem("livecam_recipientVideo", "false");
+        return { enabled: false };
+    }
+}
