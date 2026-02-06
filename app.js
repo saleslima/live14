@@ -47,4 +47,13 @@ async function init() {
 // removed button event handlers - moved to EventHandlers class
 
 // Start application
-init();
+init().catch(err => {
+    console.error("Initialization error:", err);
+    ui.setStatus("Erro ao inicializar. Recarregue a página.", "#ef4444");
+});
+
+// Global error handler for unhandled promise rejections
+window.addEventListener('unhandledrejection', event => {
+    console.error('Unhandled rejection:', event.reason);
+    event.preventDefault();
+});

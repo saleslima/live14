@@ -9,7 +9,6 @@ export class UIManager {
         this.btnDeleteLink = document.getElementById("btnDeleteLink");
         this.btnSendWhatsApp = document.getElementById("btnSendWhatsApp");
         this.btnSendSMS = document.getElementById("btnSendSMS");
-        this.btnMyVideo = document.getElementById("btnMyVideo");
         this.btnRecord = document.getElementById("btnRecord");
         this.recipientPhone = document.getElementById("recipientPhone");
         this.generatedLink = "";
@@ -74,7 +73,6 @@ export class UIManager {
         this.btnSendSMS.style.display = 'none';
         this.recipientPhone.style.display = 'none';
         this.linkDiv.style.display = 'none';
-        this.btnMyVideo.style.display = 'none';
         
         const btnToggleChat = document.getElementById("btnToggleChat");
         if (btnToggleChat) btnToggleChat.style.display = 'none';
@@ -116,10 +114,8 @@ export class UIManager {
         const message = encodeURIComponent(`Acesse este link: ${this.generatedLink}`);
         const url = `https://wa.me/${phone}?text=${message}`;
 
-        if (!this.whatsappWindow || this.whatsappWindow.closed) {
-            this.whatsappWindow = window.open(url, 'whatsappWindow');
-        } else {
-            this.whatsappWindow.location.href = url;
+        this.whatsappWindow = window.open(url, 'whatsappWindow');
+        if (this.whatsappWindow) {
             this.whatsappWindow.focus();
         }
     }
@@ -151,7 +147,14 @@ export class UIManager {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `gravacao_${Date.now()}.webm`;
+            
+            // Get phone number and format date
+            const phone = this.recipientPhone.value.replace(/\D/g, '') || 'sem-numero';
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+            const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-'); // HH-MM-SS
+            
+            a.download = `${phone}_${dateStr}_${timeStr}.webm`;
             a.click();
             this.setStatus('Gravação salva!');
         };
@@ -172,15 +175,4 @@ export class UIManager {
         }
     }
 
-    updateMyVideoButton(enabled) {
-        if (enabled) {
-            this.btnMyVideo.textContent = '📹 Parar Meu Vídeo';
-            this.btnMyVideo.style.background = '#ef4444';
-            this.setStatus('Compartilhando seu vídeo...');
-        } else {
-            this.btnMyVideo.textContent = '📹 Meu Vídeo';
-            this.btnMyVideo.style.background = '#0b5cff';
-            this.setStatus('Vídeo desativado');
-        }
-    }
 }

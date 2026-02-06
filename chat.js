@@ -29,6 +29,8 @@ export class ChatManager {
         reader.onload = () => {
             const dataUrl = reader.result;
             this.peerConnection.sendData({ type: 'image', dataUrl });
+            
+            this.removeExistingImages();
 
             const msgDiv = document.createElement('div');
             msgDiv.className = 'message sent';
@@ -59,6 +61,7 @@ export class ChatManager {
     }
 
     receiveImage(dataUrl) {
+        this.removeExistingImages();
         const msgDiv = document.createElement('div');
         msgDiv.className = 'message received';
         const img = document.createElement('img');
@@ -73,5 +76,14 @@ export class ChatManager {
         this.chatBox.style.display = this.chatVisible ? 'flex' : 'none';
         const btnToggleChat = document.getElementById("btnToggleChat");
         btnToggleChat.textContent = this.chatVisible ? '💬 Ocultar Chat' : '💬 Mostrar Chat';
+    }
+
+    removeExistingImages() {
+        const messages = this.chatMessages.querySelectorAll('.message');
+        messages.forEach(msg => {
+            if (msg.querySelector('img')) {
+                msg.remove();
+            }
+        });
     }
 }

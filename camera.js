@@ -6,11 +6,9 @@ export class CameraManager {
         this.senderStream = null;
         this.usingFrontCamera = true;
         this.localVideoElement = null;
-        this.senderVideoElement = null;
         this.remoteVideoElement = null;
         this.localVideoAdded = false;
         this.remoteVideoAdded = false;
-        this.senderVideoActive = false;
         this.videosContainer = document.getElementById("videos");
     }
 
@@ -18,10 +16,20 @@ export class CameraManager {
         if (this.localStream) return this.localStream;
         
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
-                audio: true
-            });
+            // Try with facingMode first (works on mobile)
+            try {
+                this.localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
+                    audio: true
+                });
+            } catch (e) {
+                // Fallback for desktop/devices without facingMode support
+                console.log("FacingMode not supported, using default camera:", e);
+                this.localStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+            }
             
             if (!this.localVideoAdded) {
                 this.addVideo(this.localStream, true, true);
@@ -65,22 +73,6 @@ export class CameraManager {
         }
     }
 
-    async restoreSenderVideo() {
-        const newStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
-            audio: true
-        });
-        
-        if (this.senderStream) {
-            this.senderStream.getTracks().forEach(t => t.stop());
-        }
-        
-        this.senderStream = newStream;
-        this.addVideo(this.senderStream, true, false, true);
-        
-        return this.senderStream;
-    }
-
     stopLocalCamera() {
         try {
             if (this.localStream) {
@@ -96,10 +88,9 @@ export class CameraManager {
         }
     }
 
-    addVideo(stream, muted = false, isLocal = false, isSender = false) {
+    addVideo(stream, muted = false, isLocal = false) {
         if (isLocal && this.localVideoAdded) return;
-        if (!isLocal && !isSender && this.remoteVideoAdded) return;
-        if (isSender && this.senderVideoActive) return;
+        if (!isLocal && this.remoteVideoAdded) return;
 
         const wrapper = document.createElement("div");
         wrapper.className = "video-wrapper";
@@ -126,25 +117,6 @@ export class CameraManager {
                 btnSwitchCamera.style.display = "block";
                 wrapper.appendChild(btnSwitchCamera);
             }
-        } else if (isSender) {
-            this.senderVideoActive = true;
-            this.senderVideoElement = video;
-            
-            const btnSwitchSender = document.createElement("button");
-            btnSwitchSender.id = "btnSwitchSenderCamera";
-            btnSwitchSender.textContent = "🔄 Trocar";
-            btnSwitchSender.style.cssText = `
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background: rgba(15,23,42,0.8);
-                font-size: 13px;
-                padding: 6px 10px;
-                z-index: 20;
-            `;
-            wrapper.appendChild(btnSwitchSender);
-            
-            this.videosContainer.classList.add('dual-video');
         } else {
             this.remoteVideoAdded = true;
             this.remoteVideoElement = video;
@@ -153,20 +125,23 @@ export class CameraManager {
         return video;
     }
 
-    removeSenderVideo() {
-        if (this.senderVideoElement) {
-            this.senderVideoElement.srcObject = null;
-            this.senderVideoElement.parentElement.remove();
-            this.senderVideoActive = false;
-            this.senderVideoElement = null;
-            this.videosContainer.classList.remove('dual-video');
-        }
-    }
-
     async switchCamera() {
         try {
+            // Check if device has multiple cameras before attempting switch
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            if (videoDevices.length < 2) {
+                throw new Error('Dispositivo possui apenas uma câmera');
+            }
+
             this.usingFrontCamera = !this.usingFrontCamera;
             
+            // Stop current video tracks first to release camera hardware (crucial for mobile)
+            if (this.localStream) {
+                this.localStream.getVideoTracks().forEach(t => t.stop());
+            }
+
             const constraints = {
                 video: {
                     facingMode: { exact: this.usingFrontCamera ? "user" : "environment" }
@@ -178,16 +153,36 @@ export class CameraManager {
             try {
                 newStream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch (e) {
-                // Fallback if exact constraint fails
                 console.log("Exact facingMode failed, trying ideal:", e);
                 constraints.video = {
                     facingMode: { ideal: this.usingFrontCamera ? "user" : "environment" }
                 };
-                newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                try {
+                    newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (innerE) {
+                    console.log("FacingMode not supported, trying deviceId method:", innerE);
+                    // Fallback: cycle through available cameras by deviceId
+                    const currentDeviceId = this.localStream?.getVideoTracks()[0]?.getSettings()?.deviceId;
+                    const nextDevice = videoDevices.find(d => d.deviceId !== currentDeviceId) || videoDevices[0];
+                    
+                    try {
+                        newStream = await navigator.mediaDevices.getUserMedia({
+                            video: { deviceId: { exact: nextDevice.deviceId } },
+                            audio: true
+                        });
+                    } catch (finalE) {
+                        console.error("Failed to switch camera:", finalE);
+                        this.usingFrontCamera = !this.usingFrontCamera;
+                        throw new Error('Não foi possível trocar de câmera');
+                    }
+                }
             }
 
+            // Stop any remaining tracks (like audio) from old stream
             if (this.localStream) {
-                this.localStream.getTracks().forEach(t => t.stop());
+                this.localStream.getTracks().forEach(t => {
+                    if (t.readyState !== 'ended') t.stop();
+                });
             }
 
             this.localStream = newStream;
@@ -199,148 +194,11 @@ export class CameraManager {
             return newStream;
         } catch (err) {
             console.error("Erro ao trocar câmera:", err);
-            // Revert the flag if failed
-            this.usingFrontCamera = !this.usingFrontCamera;
             throw err;
         }
     }
 
-    async toggleSenderVideo(currentCall) {
-        const hasVideo = this.senderStream && this.senderStream.getVideoTracks().length > 0;
-        
-        if (!hasVideo) {
-            // Request camera access (this gives permission for all cameras on the device)
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: this.usingFrontCamera ? "user" : "environment" },
-                audio: true
-            });
-            
-            if (this.senderStream) {
-                this.senderStream.getTracks().forEach(t => t.stop());
-            }
-            
-            this.senderStream = newStream;
-            
-            // Always add video to ensure it's displayed on sender's screen
-            if (!this.senderVideoActive) {
-                this.addVideo(this.senderStream, true, false, true);
-            } else if (this.senderVideoElement) {
-                this.senderVideoElement.srcObject = this.senderStream;
-                this.senderVideoElement.style.display = 'block';
-            }
-            
-            if (currentCall && currentCall.peerConnection) {
-                const videoTrack = this.senderStream.getVideoTracks()[0];
-                const audioTrack = this.senderStream.getAudioTracks()[0];
-                
-                const senders = currentCall.peerConnection.getSenders();
-                senders.forEach(sender => {
-                    if (sender.track) {
-                        if (sender.track.kind === "video") {
-                            sender.replaceTrack(videoTrack);
-                        } else if (sender.track.kind === "audio") {
-                            sender.replaceTrack(audioTrack);
-                        }
-                    }
-                });
-            }
-            
-            localStorage.setItem("livecam_senderVideo", "true");
-            return { enabled: true };
-        } else {
-            const audioOnlyStream = await navigator.mediaDevices.getUserMedia({
-                video: false,
-                audio: true
-            });
-            
-            if (this.senderStream) {
-                this.senderStream.getTracks().forEach(t => t.stop());
-            }
-            
-            this.senderStream = audioOnlyStream;
-            
-            if (currentCall && currentCall.peerConnection) {
-                const audioTrack = this.senderStream.getAudioTracks()[0];
-                
-                const senders = currentCall.peerConnection.getSenders();
-                senders.forEach(sender => {
-                    if (sender.track) {
-                        if (sender.track.kind === "video") {
-                            sender.replaceTrack(null);
-                        } else if (sender.track.kind === "audio") {
-                            sender.replaceTrack(audioTrack);
-                        }
-                    }
-                });
-            }
-            
-            this.removeSenderVideo();
-            
-            localStorage.setItem("livecam_senderVideo", "false");
-            return { enabled: false };
-        }
-    }
 
-    async switchSenderCamera(currentCall) {
-        if (!this.senderStream || this.senderStream.getVideoTracks().length === 0) {
-            return;
-        }
-
-        try {
-            this.usingFrontCamera = !this.usingFrontCamera;
-            
-            const constraints = {
-                video: {
-                    facingMode: { exact: this.usingFrontCamera ? "user" : "environment" }
-                },
-                audio: true,
-            };
-            
-            let newStream;
-            try {
-                newStream = await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (e) {
-                // Fallback if exact constraint fails
-                console.log("Exact facingMode failed, trying ideal:", e);
-                constraints.video = {
-                    facingMode: { ideal: this.usingFrontCamera ? "user" : "environment" }
-                };
-                newStream = await navigator.mediaDevices.getUserMedia(constraints);
-            }
-
-            if (this.senderStream) {
-                this.senderStream.getTracks().forEach(t => t.stop());
-            }
-
-            this.senderStream = newStream;
-
-            if (this.senderVideoElement) {
-                this.senderVideoElement.srcObject = this.senderStream;
-            }
-
-            if (currentCall && currentCall.peerConnection) {
-                const videoTrack = this.senderStream.getVideoTracks()[0];
-                const audioTrack = this.senderStream.getAudioTracks()[0];
-                
-                const senders = currentCall.peerConnection.getSenders();
-                senders.forEach(sender => {
-                    if (sender.track) {
-                        if (sender.track.kind === "video") {
-                            sender.replaceTrack(videoTrack);
-                        } else if (sender.track.kind === "audio") {
-                            sender.replaceTrack(audioTrack);
-                        }
-                    }
-                });
-            }
-
-            return newStream;
-        } catch (err) {
-            console.error("Erro ao trocar câmera do remetente:", err);
-            this.usingFrontCamera = !this.usingFrontCamera;
-            throw err;
-        }
-    }
 
     async toggleRecipientVideo(currentCall) {
         const hasVideo = this.localStream && this.localStream.getVideoTracks().length > 0;
@@ -372,12 +230,10 @@ export class CameraManager {
                 
                 const senders = currentCall.peerConnection.getSenders();
                 senders.forEach(sender => {
-                    if (sender.track) {
-                        if (sender.track.kind === "video") {
-                            sender.replaceTrack(videoTrack);
-                        } else if (sender.track.kind === "audio") {
-                            sender.replaceTrack(audioTrack);
-                        }
+                    if (sender.track && sender.track.kind === 'audio') {
+                        if (audioTrack) sender.replaceTrack(audioTrack);
+                    } else {
+                        if (videoTrack) sender.replaceTrack(videoTrack);
                     }
                 });
             }

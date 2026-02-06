@@ -10,20 +10,9 @@ export class ConnectionSetup {
     }
 
     async setupSenderMode() {
-        // Restore sender video state from localStorage
-        const senderVideoEnabled = localStorage.getItem("livecam_senderVideo") === "true";
-        if (senderVideoEnabled) {
-            try {
-                await this.camera.restoreSenderVideo();
-                this.ui.updateMyVideoButton(true);
-            } catch (e) {
-                console.error("Failed to restore sender video:", e);
-                localStorage.removeItem("livecam_senderVideo");
-            }
-        }
-        
         // Handle incoming calls
         this.peerConnection.onStream(async (call) => {
+            // Start audio only for sender (viewer)
             const mediaStream = this.camera.senderStream || await this.camera.startSenderMedia();
             call.answer(mediaStream);
             this.peerConnection.currentCall = call;
@@ -31,8 +20,16 @@ export class ConnectionSetup {
             call.on("stream", remoteStream => {
                 this.camera.addVideo(remoteStream, false, false, false);
                 this.ui.setStatus("Visitante conectado");
-                this.ui.btnMyVideo.disabled = false;
                 this.ui.btnRecord.disabled = false;
+            });
+            
+            call.on('track', (track, stream) => {
+                if (this.camera.remoteVideoElement) {
+                    this.camera.remoteVideoElement.srcObject = stream;
+                    if (track.kind === 'video') {
+                        this.camera.remoteVideoElement.style.display = 'block';
+                    }
+                }
             });
         });
 
@@ -51,14 +48,6 @@ export class ConnectionSetup {
                 this.chat.receiveMessage(data.message);
             } else if (data.type === 'image') {
                 this.chat.receiveImage(data.dataUrl);
-            } else if (data.type === 'sender_video_stopped') {
-                this.camera.removeSenderVideo();
-            } else if (data.type === 'video_permission_request') {
-                if (confirm('O remetente deseja compartilhar vídeo. Aceitar?')) {
-                    this.peerConnection.sendData({ type: 'video_permission_granted' });
-                } else {
-                    this.peerConnection.sendData({ type: 'video_permission_denied' });
-                }
             }
         });
     }
@@ -77,6 +66,19 @@ export class ConnectionSetup {
             
             const params = new URLSearchParams(window.location.search);
             const room = params.get("r");
+            
+            if (!room) {
+                this.ui.setStatus("Link inválido", "#ef4444");
+                return;
+            }
+
+            // Add error handler before making call
+            this.peerConnection.onError((err) => {
+                console.error("Peer error:", err);
+                this.ui.setStatus("Erro: Link inválido ou expirado. Recarregue a página.", "#ef4444");
+                this.camera.stopLocalCamera();
+            });
+
             const call = this.peerConnection.call(room, this.camera.localStream);
             this.peerConnection.currentCall = call;
             
@@ -130,20 +132,32 @@ export class ConnectionSetup {
                 } else if (data.type === 'stop_camera') {
                     this.camera.stopLocalCamera();
                     this.ui.setStatus('Câmera encerrada pelo remetente.');
-                } else if (data.type === 'sender_video_stopped') {
-                    this.camera.removeSenderVideo();
                 } else if (data.type === 'recipient_video_toggle') {
-                    // Handle recipient video toggle notification
-                    this.ui.setStatus(data.enabled ? 'Visitante ativou vídeo' : 'Visitante desativou vídeo');
-                } else if (data.type === 'link_deleted') {
-                    alert('O link foi excluído pelo remetente. A conexão será encerrada.');
-                    this.camera.stopLocalCamera();
-                    window.close();
-                } else if (data.type === 'video_permission_request') {
-                    if (confirm('O remetente deseja compartilhar vídeo. Aceitar?')) {
-                        this.peerConnection.sendData({ type: 'video_permission_granted' });
+                    if (data.enabled) {
+                        this.ui.setStatus('Visitante ativou vídeo');
+                        // Ensure the recipient's video is visible on sender's screen
+                        if (this.camera.remoteVideoElement && this.camera.remoteVideoElement.srcObject) {
+                            this.camera.remoteVideoElement.style.display = 'block';
+                        }
                     } else {
-                        this.peerConnection.sendData({ type: 'video_permission_denied' });
+                        this.ui.setStatus('Visitante desativou vídeo');
+                        if (this.camera.remoteVideoElement) {
+                            this.camera.remoteVideoElement.style.display = 'none';
+                        }
+                    }
+                } else if (data.type === 'link_deleted') {
+                    this.camera.stopLocalCamera();
+                    this.ui.setStatus('Link excluído. Conexão encerrada.', '#ef4444');
+                    
+                    // Disable all controls
+                    const btnSwitchCamera = document.getElementById("btnSwitchCamera");
+                    const btnReload = document.getElementById("btnReload");
+                    if (btnSwitchCamera) btnSwitchCamera.disabled = true;
+                    if (btnReload) btnReload.disabled = true;
+                    
+                    // Hide video
+                    if (this.camera.localVideoElement) {
+                        this.camera.localVideoElement.style.display = 'none';
                     }
                 }
             });

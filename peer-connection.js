@@ -13,34 +13,49 @@ export class PeerConnection {
 
     async initialize() {
         const storedPeerId = localStorage.getItem("livecam_peerId");
-        this.peer = new Peer(storedPeerId || undefined);
-
+        
         return new Promise((resolve) => {
-            this.peer.on("open", (id) => {
-                this.peerId = id;
-                const params = new URLSearchParams(location.search);
-                const room = params.get("r");
-                
-                if (!storedPeerId && !room) {
-                    localStorage.setItem("livecam_peerId", this.peerId);
-                }
-                resolve(id);
-            });
+            const initPeer = (idToUse) => {
+                const peer = new Peer(idToUse);
 
-            this.peer.on("call", async (call) => {
-                if (this.onStreamCallback) {
-                    await this.onStreamCallback(call);
-                }
-            });
+                peer.on("open", (id) => {
+                    this.peer = peer;
+                    this.peerId = id;
+                    const params = new URLSearchParams(location.search);
+                    const room = params.get("r");
+                    
+                    if (!room) {
+                        localStorage.setItem("livecam_peerId", this.peerId);
+                    }
+                    resolve(id);
+                });
 
-            this.peer.on('connection', (conn) => {
-                this.dataConnection = conn;
-                conn.on('data', (data) => {
-                    if (this.onDataCallback) {
-                        this.onDataCallback(data);
+                peer.on("error", (err) => {
+                    console.error("PeerJS Error:", err);
+                    if (err.type === 'unavailable-id' || err.type === 'invalid-id') {
+                        localStorage.removeItem("livecam_peerId");
+                        peer.destroy();
+                        initPeer(undefined);
                     }
                 });
-            });
+
+                peer.on("call", async (call) => {
+                    if (this.onStreamCallback) {
+                        await this.onStreamCallback(call);
+                    }
+                });
+
+                peer.on('connection', (conn) => {
+                    this.dataConnection = conn;
+                    conn.on('data', (data) => {
+                        if (this.onDataCallback) {
+                            this.onDataCallback(data);
+                        }
+                    });
+                });
+            };
+
+            initPeer(storedPeerId || undefined);
         });
     }
 
@@ -50,6 +65,13 @@ export class PeerConnection {
         this.currentCall.on("stream", (remoteStream) => {
             if (this.onStreamCallback) {
                 this.onStreamCallback(remoteStream, true);
+            }
+        });
+
+        this.currentCall.on("error", (err) => {
+            console.error("Call error:", err);
+            if (this.onErrorCallback) {
+                this.onErrorCallback(err);
             }
         });
 
@@ -68,6 +90,13 @@ export class PeerConnection {
         this.dataConnection.on('data', (data) => {
             if (this.onDataCallback) {
                 this.onDataCallback(data);
+            }
+        });
+
+        this.dataConnection.on('error', (err) => {
+            console.error("Data connection error:", err);
+            if (this.onErrorCallback) {
+                this.onErrorCallback(err);
             }
         });
 
@@ -96,5 +125,9 @@ export class PeerConnection {
 
     onConnectionReady(callback) {
         this.onConnectionReadyCallback = callback;
+    }
+
+    onError(callback) {
+        this.onErrorCallback = callback;
     }
 }

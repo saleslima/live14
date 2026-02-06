@@ -101,6 +101,15 @@ video {
     #videos.dual-video {
         height: 400px;
     }
+
+    video {
+        width: 100%;
+        height: auto;
+    }
+
+    .video-wrapper {
+        width: 100%;
+    }
 }
 .status {
     font-size: 13px;
@@ -183,10 +192,16 @@ video {
         height: calc(100vh - 160px);
         box-sizing: border-box;
     }
-    #leftPane,
+    #leftPane {
+        flex: 0 0 40%;
+        max-width: 40%;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
     #rightPane {
-        flex: 1;
-        max-width: 50%;
+        flex: 0 0 60%;
+        max-width: 60%;
         overflow: auto;
         display: flex;
         flex-direction: column;
@@ -196,11 +211,21 @@ video {
         position: relative;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
     #videos {
         flex: 1;
+        position: relative;
     }
-    #addressLeft,
+    #chat {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+    }
+    #addressLeft {
+        display: none;
+    }
     #addressRight {
         margin-top: 10px;
     }
