@@ -13,21 +13,21 @@
 <header>📡 Live Cam</header>
 
 <div id="controls">
-    <button id="btnLink" disabled>🔗 Gerar Link</button>
-    <button id="btnCopy" disabled>📋 Copiar Link</button>
-    <button id="btnDeleteLink" disabled>❌ Excluir Link</button>
-    <button id="btnRecord" disabled>⏺️ Gravar Vídeo</button>
-    <button id="btnToggleChat">💬 Ocultar Chat</button>
-    <button id="btnSwitchCamera" style="display:none;">🔄 Trocar Câmera</button>
-    <button id="btnReload" style="display:none;">🔄 Recarregar</button>
-    <div class="status" id="status">Inicializando conexão...</div>
-    <div id="link"></div>
-    
-    <div style="margin-top: 15px;">
+    <button id="btnToggleControls">➖ Ocultar Botões</button>
+    <div id="controlButtons">
+        <button id="btnLink" disabled>🔗 Gerar Link</button>
+        <button id="btnCopy" disabled>📋 Copiar Link</button>
+        <button id="btnDeleteLink" disabled>❌ Excluir Link</button>
+        <button id="btnRecord" disabled>⏺️ Gravar Vídeo</button>
+        <button id="btnToggleChat">💬 Ocultar Chat</button>
+        <button id="btnSwitchCamera" style="display:none;">🔄 Trocar Câmera</button>
+        <button id="btnReload" style="display:none;">🔄 Recarregar</button>
         <input type="tel" id="recipientPhone" placeholder="+55 (DDD) 9XXXX-XXXX">
         <button id="btnSendWhatsApp" disabled>📱 WhatsApp</button>
         <button id="btnSendSMS" disabled>💬 SMS</button>
     </div>
+    <div class="status" id="status">Inicializando conexão...</div>
+    <div id="link"></div>
 </div>
 
 <div id="mainLayout">

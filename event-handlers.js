@@ -11,6 +11,19 @@ export class EventHandlers {
     }
 
     setupEventListeners() {
+        // Toggle controls visibility
+        const btnToggleControls = document.getElementById("btnToggleControls");
+        const controlButtons = document.getElementById("controlButtons");
+        btnToggleControls.onclick = () => {
+            if (controlButtons.style.display === 'none') {
+                controlButtons.style.display = 'flex';
+                btnToggleControls.textContent = '➖ Ocultar Botões';
+            } else {
+                controlButtons.style.display = 'none';
+                btnToggleControls.textContent = '➕ Mostrar Botões';
+            }
+        };
+        
         // Link management buttons
         this.ui.btnLink.onclick = () => this.handleGenerateLink();
         this.ui.btnCopy.onclick = () => this.handleCopyLink();
