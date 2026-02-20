@@ -12,7 +12,7 @@ export class ConnectionSetup {
     async setupSenderMode() {
         // Handle incoming calls
         this.peerConnection.onStream(async (call) => {
-            // Start audio only for sender (viewer)
+            // Start video for sender
             const mediaStream = this.camera.senderStream || await this.camera.startSenderMedia();
             call.answer(mediaStream);
             this.peerConnection.currentCall = call;
@@ -21,6 +21,10 @@ export class ConnectionSetup {
                 this.camera.addVideo(remoteStream, false, false, false);
                 this.ui.setStatus("Visitante conectado");
                 this.ui.btnRecord.disabled = false;
+                this.ui.btnBlur.disabled = false;
+                
+                const btnToggleSenderVideo = document.getElementById("btnToggleSenderVideo");
+                if (btnToggleSenderVideo) btnToggleSenderVideo.disabled = false;
             });
             
             call.on('track', (track, stream) => {
@@ -57,13 +61,6 @@ export class ConnectionSetup {
             // Check if recipient had video enabled
             const recipientVideoEnabled = localStorage.getItem("livecam_recipientVideo") !== "false";
             
-            if (recipientVideoEnabled) {
-                await this.camera.startCamera();
-            } else {
-                await this.camera.startAudioOnly();
-            }
-            this.ui.setStatus("Conectando...");
-            
             const params = new URLSearchParams(window.location.search);
             const room = params.get("r");
             
@@ -72,12 +69,19 @@ export class ConnectionSetup {
                 return;
             }
 
-            // Add error handler before making call
+            // Add error handler BEFORE starting camera or making call
             this.peerConnection.onError((err) => {
                 console.error("Peer error:", err);
                 this.ui.setStatus("Erro: Link inválido ou expirado. Recarregue a página.", "#ef4444");
                 this.camera.stopLocalCamera();
             });
+
+            if (recipientVideoEnabled) {
+                await this.camera.startCamera();
+            } else {
+                await this.camera.startAudioOnly();
+            }
+            this.ui.setStatus("Conectando...");
 
             const call = this.peerConnection.call(room, this.camera.localStream);
             this.peerConnection.currentCall = call;

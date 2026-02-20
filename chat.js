@@ -6,7 +6,6 @@ export class ChatManager {
         this.chatMessages = document.getElementById("chatMessages");
         this.messageInput = document.getElementById("messageInput");
         this.chatBox = document.getElementById("chat");
-        this.chatVisible = true;
     }
 
     sendMessage(text) {
@@ -16,7 +15,7 @@ export class ChatManager {
         
         const msgDiv = document.createElement('div');
         msgDiv.className = 'message sent';
-        msgDiv.textContent = text;
+        msgDiv.innerHTML = '⚡ ' + this.escapeHtml(text);
         this.chatMessages.appendChild(msgDiv);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
         this.messageInput.value = '';
@@ -44,18 +43,9 @@ export class ChatManager {
     }
 
     receiveMessage(text) {
-        if (!this.chatVisible) {
-            this.chatBox.style.display = 'flex';
-            this.chatVisible = true;
-            const btnToggleChat = document.getElementById("btnToggleChat");
-            if (btnToggleChat) {
-                btnToggleChat.textContent = '💬 Ocultar Chat';
-            }
-        }
-
         const msgDiv = document.createElement('div');
         msgDiv.className = 'message received';
-        msgDiv.textContent = text;
+        msgDiv.innerHTML = '🎧 ' + this.escapeHtml(text);
         this.chatMessages.appendChild(msgDiv);
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
@@ -71,11 +61,10 @@ export class ChatManager {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
 
-    toggleChat() {
-        this.chatVisible = !this.chatVisible;
-        this.chatBox.style.display = this.chatVisible ? 'flex' : 'none';
-        const btnToggleChat = document.getElementById("btnToggleChat");
-        btnToggleChat.textContent = this.chatVisible ? '💬 Ocultar Chat' : '💬 Mostrar Chat';
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     removeExistingImages() {

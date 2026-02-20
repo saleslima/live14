@@ -35,6 +35,10 @@ export class EventHandlers {
         
         // Video controls
         this.ui.btnRecord.onclick = () => this.handleRecord();
+        this.ui.btnBlur.onclick = () => this.handleBlur();
+        
+        const btnToggleSenderVideo = document.getElementById("btnToggleSenderVideo");
+        btnToggleSenderVideo.onclick = () => this.handleToggleSenderVideo();
         
         const btnSwitchCamera = document.getElementById("btnSwitchCamera");
         btnSwitchCamera.onclick = () => this.handleSwitchCamera();
@@ -45,7 +49,6 @@ export class EventHandlers {
         // Chat controls
         const btnSend = document.getElementById("btnSend");
         const messageInput = document.getElementById("messageInput");
-        const btnToggleChat = document.getElementById("btnToggleChat");
         const btnImage = document.getElementById("btnImage");
         const imageInput = document.getElementById("imageInput");
         
@@ -56,8 +59,6 @@ export class EventHandlers {
                 this.chat.sendMessage(messageInput.value);
             }
         });
-        
-        btnToggleChat.onclick = () => this.chat.toggleChat();
         
         btnImage.onclick = () => imageInput.click();
         
@@ -73,6 +74,20 @@ export class EventHandlers {
             }
             imageInput.value = '';
         });
+        
+        // Chat toggle
+        const btnToggleChat = document.getElementById("btnToggleChat");
+        const chat = document.getElementById("chat");
+        
+        btnToggleChat.onclick = () => {
+            if (chat.style.display === 'none') {
+                chat.style.display = 'flex';
+                btnToggleChat.textContent = '➖ Ocultar Chat';
+            } else {
+                chat.style.display = 'none';
+                btnToggleChat.textContent = '➕ Mostrar Chat';
+            }
+        };
     }
 
     handleGenerateLink() {
@@ -119,6 +134,10 @@ export class EventHandlers {
         }
     }
 
+    handleBlur() {
+        this.ui.toggleBlur(this.camera.remoteVideoElement);
+    }
+
     async handleSwitchCamera() {
         try {
             const newStream = await this.camera.switchCamera();
@@ -142,6 +161,16 @@ export class EventHandlers {
         } catch (err) {
             console.error("Erro ao trocar câmera:", err);
             this.ui.setStatus("Erro ao trocar câmera", "#ef4444");
+        }
+    }
+
+    handleToggleSenderVideo() {
+        this.ui.toggleSenderVideo();
+        const btnToggleSenderVideo = document.getElementById("btnToggleSenderVideo");
+        if (this.ui.senderVideoVisible) {
+            btnToggleSenderVideo.textContent = '👁️ Inibir Meu Vídeo';
+        } else {
+            btnToggleSenderVideo.textContent = '👁️ Mostrar Meu Vídeo';
         }
     }
 

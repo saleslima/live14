@@ -4,6 +4,135 @@ body {
     color: #fff;
     font-family: Arial, sans-serif;
 }
+
+#loginScreen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #0f172a;
+}
+
+.login-container {
+    background: #1e293b;
+    padding: 30px;
+    border-radius: 12px;
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.login-container h2 {
+    margin: 0 0 10px 0;
+    text-align: center;
+}
+
+.login-container select,
+.login-container input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.login-error {
+    color: #ef4444;
+    font-size: 13px;
+    text-align: center;
+    min-height: 20px;
+}
+
+#adminPanel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.admin-container {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.admin-container h2 {
+    margin: 0 0 15px 0;
+}
+
+.admin-container h3 {
+    margin: 15px 0 10px 0;
+}
+
+#adminTabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 15px;
+}
+
+.admin-tab {
+    padding: 8px 15px;
+    background: #334155;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.admin-tab.active {
+    background: #0b5cff;
+}
+
+#userForm {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#userForm input,
+#userForm select {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.user-item,
+.connection-item {
+    background: #334155;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-item button,
+.connection-item button {
+    padding: 6px 12px;
+    font-size: 13px;
+    margin-left: 5px;
+}
+
+.btn-edit {
+    background: #0b5cff;
+}
+
+.btn-delete {
+    background: #ef4444;
+}
+
+.btn-monitor {
+    background: #22c55e;
+}
 header {
     background: #0b5cff;
     padding: 12px;
@@ -145,7 +274,12 @@ video {
     pointer-events: none;
 }
 #chatHeader {
-    display: none;
+    background: rgba(15,23,42,0.9);
+    padding: 8px;
+    border-radius: 6px 6px 0 0;
+    font-weight: bold;
+    pointer-events: auto;
+    margin-bottom: 4px;
 }
 #chatMessages {
     flex: 1;
@@ -258,6 +392,27 @@ video {
     font-size: 13px;
     padding: 6px 10px;
     z-index: 20;
+}
+
+.sender-pip {
+    position: absolute;
+    bottom: 60px;
+    right: 10px;
+    width: 20%;
+    max-width: 150px;
+    min-width: 80px;
+    z-index: 100;
+    border: 2px solid #0b5cff;
+    border-radius: 8px;
+    overflow: hidden;
+    background: black;
+}
+
+.sender-pip video {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
 }
 
 @media (max-width: 768px) {

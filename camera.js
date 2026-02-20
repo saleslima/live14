@@ -48,9 +48,25 @@ export class CameraManager {
         
         try {
             this.senderStream = await navigator.mediaDevices.getUserMedia({ 
-                video: false, 
+                video: true, 
                 audio: true 
             });
+            
+            // Add sender's own video as PIP overlay
+            const wrapper = document.createElement("div");
+            wrapper.className = "sender-pip";
+            wrapper.id = "senderPipWrapper";
+            
+            const video = document.createElement("video");
+            video.srcObject = this.senderStream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            video.id = "senderPipVideo";
+            
+            wrapper.appendChild(video);
+            this.videosContainer.appendChild(wrapper);
+            
             return this.senderStream;
         } catch (error) {
             console.error("Erro ao acessar mídia do remetente:", error);
@@ -100,7 +116,14 @@ export class CameraManager {
         video.autoplay = true;
         video.playsInline = true;
         video.muted = muted;
-        video.style.display = 'block';
+        
+        // Ensure video tracks are displayed
+        const videoTracks = stream.getVideoTracks();
+        if (videoTracks && videoTracks.length > 0) {
+            video.style.display = 'block';
+        } else {
+            video.style.display = 'none';
+        }
 
         wrapper.appendChild(video);
         
@@ -121,6 +144,13 @@ export class CameraManager {
             this.remoteVideoAdded = true;
             this.remoteVideoElement = video;
         }
+
+        // Force video to play on mobile
+        video.play().catch(err => {
+            console.log("Autoplay prevented, trying muted:", err);
+            video.muted = true;
+            video.play().catch(e => console.error("Video play failed:", e));
+        });
 
         return video;
     }
