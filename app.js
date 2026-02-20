@@ -15,8 +15,11 @@ const auth = new AuthManager();
 const admin = new AdminManager(auth);
 
 // Check if user is logged in
+const params = new URLSearchParams(window.location.search);
+const isRecipient = params.get("r") || params.get("monitor");
 const currentUser = auth.getCurrentUser();
-if (!currentUser) {
+
+if (!currentUser && !isRecipient) {
     // Show login screen
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appScreen').style.display = 'none';
@@ -40,11 +43,13 @@ if (!currentUser) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'block';
     
-    // Display user info
-    document.getElementById('userInfo').textContent = `${currentUser.username} (${currentUser.profile})`;
+    // Display user info only if logged in
+    if (currentUser) {
+        document.getElementById('userInfo').textContent = `${currentUser.username} (${currentUser.profile})`;
+    }
     
-    // Show admin button for supervisors
-    if (auth.isSupervisor()) {
+    // Show admin button for supervisors (only for logged in users)
+    if (currentUser && auth.isSupervisor()) {
         document.getElementById('btnAdmin').style.display = 'inline-block';
         document.getElementById('connectionsTab').style.display = 'inline-block';
     }
@@ -54,6 +59,11 @@ if (!currentUser) {
         auth.logout();
         location.reload();
     };
+    
+    // Hide logout button for recipients
+    if (isRecipient) {
+        document.getElementById('btnLogout').style.display = 'none';
+    }
     
     // Admin panel handlers
     document.getElementById('btnAdmin').onclick = () => {
@@ -128,8 +138,7 @@ if (!currentUser) {
     const connectionSetup = new ConnectionSetup(peerConnection, camera, chat, location, ui);
     const eventHandlers = new EventHandlers(peerConnection, camera, chat, ui);
 
-    // Get URL parameters
-    const params = new URLSearchParams(window.location.search);
+    // Get URL parameters (already defined above for recipient check)
     const room = params.get("r");
     const monitor = params.get("monitor");
 
@@ -140,8 +149,8 @@ if (!currentUser) {
     async function init() {
         const peerId = await peerConnection.initialize();
         
-        // Track connection for operators
-        if (auth.isOperator() && !room && !monitor) {
+        // Track connection for operators (only if logged in)
+        if (currentUser && auth.isOperator() && !room && !monitor) {
             await admin.trackConnection(peerId, currentUser.username);
         }
 
